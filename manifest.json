@@ -1,0 +1,15 @@
+{
+  "name": "เงินฉัน — มอนิเตอร์พอร์ตการเงิน",
+  "short_name": "เงินฉัน",
+  "description": "แดชบอร์ดการเงินส่วนตัว ดูภาพรวมหนี้/เงินสด กราฟรายปี ทำนายแนวโน้ม",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0f766e",
+  "lang": "th",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
