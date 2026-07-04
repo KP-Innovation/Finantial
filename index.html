@@ -178,6 +178,18 @@ svg.chart{width:100%;height:auto;display:block}
 .gsav-toggle .cbx{width:20px;height:20px;border-radius:6px;border:2px solid var(--line);display:grid;place-items:center;
   font-size:12px;color:#fff;flex:none}
 .gsav-toggle .cbx.on{background:var(--teal);border-color:var(--teal)}
+.yearmini{display:flex;align-items:center;gap:2px;background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:2px 3px;flex:none}
+.yearmini button{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:7px;font-size:16px;cursor:pointer;font-family:inherit}
+.yearmini button:active{background:var(--line)}
+.yearmini b{min-width:46px;text-align:center;font-weight:800;font-size:13px}
+.runway{font-size:12.5px}
+.rw{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.rw.rwh{color:var(--muted);font-weight:700;font-size:11px;border-bottom:1px solid var(--line)}
+.rw .rwd{width:26px;text-align:center;color:var(--muted);font-weight:700;flex:none}
+.rw .rwn{flex:1;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rw .rwn i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.rw .rwa{width:58px;text-align:right;flex:none;font-weight:700}
+.rw .rwb{width:58px;text-align:right;flex:none}
 </style>
 
 <div class="app">
@@ -219,21 +231,23 @@ const KEY='finpocket_v1';
 const PALETTE=['#0f766e','#2563eb','#e11d48','#f59e0b','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5'];
 const now=new Date();
 function defaultState(){
-  return {version:1, ui:{tab:'overview', scope:'cash', year: now.getFullYear(), chart:{inc:true,exp:true,net:true}, selMonth: nowYM(), gsav:true, gHorizon:24, theme:null},
+  return {version:1, ui:{tab:'overview', scope:'cash', year: now.getFullYear(), chart:{inc:true,exp:true,net:true,sav:true}, selMonth: nowYM(), gsav:true, gHorizon:24, theme:null},
     settings:{cycleDay:15},
-    savings:0, cards:[], incomes:[], expenses:[], realestate:[], stocks:[], actuals:{}};
+    savings:0, savePlan:{auto:0, months:{}}, cards:[], incomes:[], expenses:[], realestate:[], stocks:[], actuals:{}};
 }
 function nowYM(){ return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'); }
 let S=load();
 function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.version){
     const s=Object.assign(defaultState(),r);
-    s.ui=Object.assign({tab:'overview',scope:'cash',year:now.getFullYear(),chart:{inc:true,exp:true,net:true},selMonth:nowYM(),gsav:true,gHorizon:24,theme:null}, s.ui||{});
+    s.ui=Object.assign({tab:'overview',scope:'cash',year:now.getFullYear(),chart:{inc:true,exp:true,net:true,sav:true},selMonth:nowYM(),gsav:true,gHorizon:24,theme:null}, s.ui||{});
     if(!s.ui.scope)s.ui.scope='cash';
     if(s.ui.gsav===undefined)s.ui.gsav=true;
-    s.ui.chart=Object.assign({inc:true,exp:true,net:true}, s.ui.chart||{});
+    s.ui.chart=Object.assign({inc:true,exp:true,net:true,sav:true}, s.ui.chart||{});
     s.settings=Object.assign({cycleDay:15}, s.settings||{});
+    s.savePlan=Object.assign({auto:0,months:{}}, s.savePlan||{}); s.savePlan.months=s.savePlan.months||{};
     return s;
   }}catch(e){} return defaultState(); }
+function saveForMonth(m){ if(S.savePlan.months[m]!=null)return num(S.savePlan.months[m]); return num(S.savePlan.auto); }
 function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
 const uid=()=>Math.random().toString(36).slice(2,9);
 
@@ -288,11 +302,11 @@ function css(v){ return getComputedStyle(document.documentElement).getPropertyVa
 function svgTag(w,h,inner){ return `<div class="chartwrap"><svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${inner}</svg></div>`; }
 function svgTagW(w,h,inner){ return `<div class="chartwrap"><svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMid meet" style="width:${w}px;max-width:none;height:auto">${inner}</svg></div>`; }
 
-function barPosNeg(rows, opts){ // rows:[{label,inc,exp,net}]
-  opts=Object.assign({inc:true,exp:true,net:true}, opts||{});
+function barPosNeg(rows, opts){ // rows:[{label,inc,exp,net,sav}]
+  opts=Object.assign({inc:true,exp:true,net:true,sav:true}, opts||{});
   const w=680,h=292,padL=44,padR=10,padT=16,padB=28;
   const plotH=h-padT-padB, midY=padT+plotH*0.55, halfUp=midY-padT, halfDn=(padT+plotH)-midY;
-  let maxA=0; rows.forEach(r=>{ if(opts.inc)maxA=Math.max(maxA,r.inc); if(opts.exp)maxA=Math.max(maxA,r.exp); if(opts.net)maxA=Math.max(maxA,Math.abs(r.net)); });
+  let maxA=0; rows.forEach(r=>{ if(opts.inc)maxA=Math.max(maxA, r.inc + (opts.sav?(r.sav||0):0)); if(opts.exp)maxA=Math.max(maxA,r.exp); if(opts.net)maxA=Math.max(maxA,Math.abs(r.net)); });
   maxA=niceMax(maxA||1);
   const n=rows.length, step=(w-padL-padR)/n, bw=Math.min(26,step*0.46);
   const line=css('--line'), muted=css('--muted');
@@ -306,7 +320,10 @@ function barPosNeg(rows, opts){ // rows:[{label,inc,exp,net}]
   rows.forEach((r,i)=>{
     const cx=padL+step*i+step/2, bx=cx-bw/2;
     // income and expense stacked in the SAME column: green up from 0, red down from 0
-    if(opts.inc){ const y=yOf(r.inc); g+=`<rect x="${bx.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${Math.max(0,midY-y).toFixed(1)}" rx="3" fill="${css('--green')}" opacity=".92"/>`; }
+    if(opts.inc){ const y=yOf(r.inc); g+=`<rect x="${bx.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${Math.max(0,midY-y).toFixed(1)}" rx="3" fill="${css('--green')}" opacity=".92"/>`;
+      // savings top-up (light green) stacked above income
+      if(opts.sav && (r.sav||0)>0){ const y2=yOf(r.inc+(r.sav||0)); g+=`<rect x="${bx.toFixed(1)}" y="${y2.toFixed(1)}" width="${bw}" height="${Math.max(0,y-y2).toFixed(1)}" rx="3" fill="#86efac"/>`; }
+    }
     if(opts.exp){ const y=yOf(-r.exp); g+=`<rect x="${bx.toFixed(1)}" y="${midY}" width="${bw}" height="${Math.max(0,y-midY).toFixed(1)}" rx="3" fill="${css('--red')}" opacity=".85"/>`; }
     netPts.push([cx, yOf(r.net)]);
     g+=`<text x="${cx}" y="${h-9}" text-anchor="middle" font-size="9.5" fill="${muted}">${r.label}</text>`;
@@ -357,12 +374,13 @@ function lineChart(rows,color){ // [{label,value}]
 }
 
 /* ============================ VIEWS ============================ */
-function render(){
+function render(keepScroll){
+  const sy=keepScroll?window.scrollY:0;
   el('yLabel').textContent=S.ui.year;
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===S.ui.tab));
   const v=el('view');
   ({overview:vOverview,cards:vCards,income:vIncome,realestate:vRealEstate,stocks:vStocks}[S.ui.tab]||vOverview)(v);
-  window.scrollTo({top:0});
+  window.scrollTo({top:sy});
 }
 
 function emptyBox(icon,txt,btn){ return `<div class="empty"><div class="big">${icon}</div>${txt}${btn?('<div style="margin-top:12px">'+btn+'</div>'):''}</div>`; }
@@ -373,7 +391,7 @@ function vOverview(v){
   const cash=scope==='cash';
   const y=S.ui.year, months=monthsOfYear(y);
   const asOf=curYM();
-  const rows=months.map(s=>{const a=monthAgg(s,scope); return {label:mLabel(s),inc:a.inc,exp:a.exp,net:a.net};});
+  const rows=months.map(s=>{const a=monthAgg(s,scope); return {label:mLabel(s),inc:a.inc,exp:a.exp,net:a.net,sav:saveForMonth(s)};});
   const debtNow=totalDebt(asOf,scope);
   const stocksVal=cash?0:stocksValueTotal(asOf);
   const reValue=cash?0:S.realestate.reduce((t,p)=>t+num(p.value),0);
@@ -418,25 +436,17 @@ function vOverview(v){
       <div class="cm">${mLabel(mo)}</div><div class="ca">${pos?'▲':'▼'}</div><div class="cv">${cy.net>=0?'+':''}${fmtKplain(cy.net)}</div></button>`; });
   html+=`</div></div>`;
 
-  html+=`<div class="panel"><h3>📊 รายรับ − รายจ่าย รายปี</h3><p class="sub">รายรับ = แท่งขึ้น (+) · ภาระ/รายจ่าย = แท่งลง (−) · เส้น = คงเหลือสุทธิ · แตะปุ่มเปิด/ปิดเส้นได้</p>
-    <div class="pill-row" id="chartToggles">
-      <button data-k="inc" class="tgl ${ct.inc?'on':''}" style="${ct.inc?('background:'+css('--green')+';border-color:'+css('--green')+';color:#fff'):''}">● รายรับ</button>
-      <button data-k="exp" class="tgl ${ct.exp?'on':''}" style="${ct.exp?('background:'+css('--red')+';border-color:'+css('--red')+';color:#fff'):''}">● รายจ่าย</button>
-      <button data-k="net" class="tgl ${ct.net?'on':''}" style="${ct.net?('background:'+css('--blue')+';border-color:'+css('--blue')+';color:#fff'):''}">● คงเหลือสุทธิ</button>
+  html+=`<div class="panel">
+    <div style="display:flex;align-items:center;gap:8px">
+      <h3 style="flex:1">📊 รายรับ − รายจ่าย</h3>
+      <div class="yearmini"><button id="byPrev" type="button">‹</button><b>${y+543}</b><button id="byNext" type="button">›</button></div>
     </div>
-    ${barPosNeg(rows, ct)}</div>`;
+    <p class="sub">แท่งขึ้น = รายรับ (เขียวเข้ม) + เงินเก็บ (เขียวอ่อน) · แท่งลง = รายจ่าย · เส้น = คงเหลือสุทธิ · ปัดซ้าย-ขวาเปลี่ยนปี</p>
+    <div id="barBox">${barBoxHtml()}</div></div>`;
 
   // growth projection (cumulative net worth trend into the future)
-  const gBase=S.ui.gsav?S.savings:0;
-  const gH=S.ui.gHorizon||24;
-  const growth=growthRows(gBase, asOf, gH, scope);
-  const gEnd=growth[growth.length-1].value, gStart=growth[0].value, gUp=gEnd>=gStart;
   html+=`<div class="panel"><h3>🚀 ${cash?'แนวโน้มเงินสดสะสม':'แนวโน้มทรัพย์สินสะสม'} (ทำนายอนาคต)</h3><p class="sub">รวมคงเหลือสุทธิสะสม · เลือกช่วงเวลาเพื่อซูม · เลื่อนซ้าย-ขวาดูได้</p>
-    <label class="gsav-toggle" id="gsavToggle"><span class="cbx ${S.ui.gsav?'on':''}">${S.ui.gsav?'✓':''}</span> นำเงินเก็บ (${fmtK(S.savings)}) มาเป็นจุดเริ่มของกราฟ</label>
-    <div class="pill-row" id="gHorizon">${[12,24,36,60].map(hz=>`<button data-h="${hz}" class="${gH===hz?'on':''}">${hz} เดือน</button>`).join('')}</div>
-    ${growthChart(growth)}
-    <div class="kv" style="margin-top:8px"><span>อีก ${gH} เดือน คาดว่าจะมี${S.ui.gsav?'':' (นับเฉพาะกระแสเงิน)'}</span><b style="font-size:16px;color:${gUp?css('--teal2'):css('--red')}">${fmt(gEnd)}</b></div>
-    <div class="kv"><span>เปลี่ยนแปลงจากตอนนี้</span><b style="color:${gUp?css('--green'):css('--red')}">${gUp?'+':''}${fmt(gEnd-gStart)}</b></div></div>`;
+    <div id="growthBox">${growthBoxHtml()}</div></div>`;
 
   // debt payoff trend — placed next to the growth chart
   html+=`<div class="panel"><h3>📉 ${cash?'แนวโน้มหนี้บัตร (จนกว่าจะหมด)':'แนวโน้มหนี้ (จนกว่าจะหมด)'}</h3><p class="sub">${cash?'รวมหนี้บัตร/สินเชื่อที่เหลือ':'รวมหนี้บัตร/สินเชื่อ + ค่างวดอสังหาฯ ที่เหลือ'} · เลื่อนดูรายเดือน/ปีได้</p>
@@ -475,12 +485,41 @@ function vOverview(v){
   el('btnMonthly').onclick=()=>monthlySheet();
   const bdemo=el('btnDemo'); if(bdemo)bdemo.onclick=loadDemo;
   document.querySelectorAll('#scopeSw button').forEach(b=>b.onclick=()=>{ S.ui.scope=b.dataset.s; save(); render(); });
-  document.querySelectorAll('#chartToggles button').forEach(b=>b.onclick=()=>{ S.ui.chart[b.dataset.k]=!S.ui.chart[b.dataset.k]; save(); render(); });
   document.querySelectorAll('#monPills button').forEach(b=>b.onclick=()=>{ S.ui.selMonth=b.dataset.m; save();
     document.querySelectorAll('#monPills button').forEach(x=>x.classList.toggle('on',x===b)); el('monDetail').innerHTML=monthDetailBody(b.dataset.m,scope); });
   document.querySelectorAll('.cal').forEach(b=>b.onclick=()=>cycleSheet(b.dataset.m));
-  const gt=el('gsavToggle'); if(gt)gt.onclick=()=>{ S.ui.gsav=!S.ui.gsav; save(); render(); };
-  document.querySelectorAll('#gHorizon button').forEach(b=>b.onclick=()=>{ S.ui.gHorizon=+b.dataset.h; save(); render(); });
+  el('byPrev').onclick=()=>{ S.ui.year--; save(); render(true); };
+  el('byNext').onclick=()=>{ S.ui.year++; save(); render(true); };
+  // swipe left/right on the bar chart to change year
+  const bb=el('barBox'); let sx=null;
+  bb.addEventListener('touchstart',e=>{ sx=e.touches[0].clientX; },{passive:true});
+  bb.addEventListener('touchend',e=>{ if(sx==null)return; const dx=e.changedTouches[0].clientX-sx; sx=null; if(Math.abs(dx)>60){ S.ui.year+=(dx<0?1:-1); save(); render(true); } });
+  wireBarBox(); wireGrowthBox();
+}
+function barBoxHtml(){
+  const scope=S.ui.scope||'cash', y=S.ui.year, ct=S.ui.chart;
+  const rows=monthsOfYear(y).map(s=>{const a=monthAgg(s,scope);return{label:mLabel(s),inc:a.inc,exp:a.exp,net:a.net,sav:saveForMonth(s)};});
+  const tgl=(k,label,color,txtcol)=>`<button data-k="${k}" class="tgl ${ct[k]?'on':''}" style="${ct[k]?('background:'+color+';border-color:'+color+';color:'+(txtcol||'#fff')):''}">● ${label}</button>`;
+  return `<div class="pill-row" id="chartToggles">
+      ${tgl('inc','รายรับ',css('--green'))}${tgl('sav','เงินเก็บ','#86efac','#064e3b')}${tgl('exp','รายจ่าย',css('--red'))}${tgl('net','คงเหลือสุทธิ',css('--blue'))}
+    </div>${barPosNeg(rows, ct)}`;
+}
+function wireBarBox(){ document.querySelectorAll('#chartToggles button').forEach(b=>b.onclick=()=>{ S.ui.chart[b.dataset.k]=!S.ui.chart[b.dataset.k]; save(); el('barBox').innerHTML=barBoxHtml(); wireBarBox(); }); }
+function growthBoxHtml(){
+  const scope=S.ui.scope||'cash', asOf=curYM();
+  const gBase=S.ui.gsav?S.savings:0, gH=S.ui.gHorizon||24;
+  const growth=growthRows(gBase, asOf, gH, scope);
+  const gEnd=growth[growth.length-1].value, gStart=growth[0].value, gUp=gEnd>=gStart;
+  const opts=[[12,'1 ปี'],[24,'2 ปี'],[36,'3 ปี'],[60,'5 ปี'],[120,'10 ปี']];
+  return `<label class="gsav-toggle" id="gsavToggle"><span class="cbx ${S.ui.gsav?'on':''}">${S.ui.gsav?'✓':''}</span> นำเงินเก็บ (${fmtK(S.savings)}) มาเป็นจุดเริ่มของกราฟ</label>
+    <div class="pill-row" id="gHorizon">${opts.map(([hz,lb])=>`<button data-h="${hz}" class="${gH===hz?'on':''}">${lb}</button>`).join('')}</div>
+    ${growthChart(growth)}
+    <div class="kv" style="margin-top:8px"><span>อีก ${gH>=12?(gH/12)+' ปี':gH+' เดือน'} คาดว่าจะมี${S.ui.gsav?'':' (นับเฉพาะกระแสเงิน)'}</span><b style="font-size:16px;color:${gUp?css('--teal2'):css('--red')}">${fmt(gEnd)}</b></div>
+    <div class="kv"><span>เปลี่ยนแปลงจากตอนนี้</span><b style="color:${gUp?css('--green'):css('--red')}">${gUp?'+':''}${fmt(gEnd-gStart)}</b></div>`;
+}
+function wireGrowthBox(){
+  const gt=el('gsavToggle'); if(gt)gt.onclick=()=>{ S.ui.gsav=!S.ui.gsav; save(); el('growthBox').innerHTML=growthBoxHtml(); wireGrowthBox(); };
+  document.querySelectorAll('#gHorizon button').forEach(b=>b.onclick=()=>{ S.ui.gHorizon=+b.dataset.h; save(); el('growthBox').innerHTML=growthBoxHtml(); wireGrowthBox(); });
 }
 
 /* ---------- growth projection ---------- */
@@ -561,7 +600,27 @@ function monthDetailBody(s,scope){
   h+=`<div class="kv" style="border-top:2px solid var(--line);margin-top:8px;padding-top:8px"><span>รายรับรวม</span><b style="color:${css('--green')}">${fmt(incSum)}</b></div>`;
   h+=`<div class="kv"><span>รายจ่ายรวม</span><b style="color:${css('--red')}">${fmt(expSum)}</b></div>`;
   h+=`<div class="kv"><span><b>คงเหลือสุทธิ</b></span><b style="font-size:17px;color:${incSum-expSum>=0?css('--green'):css('--red')}">${fmt(incSum-expSum)}</b></div>`;
+  h+=dailyRunwayHtml(s,scope);
   return h;
+}
+function dailyRunwayHtml(s,scope){
+  const evts=[];
+  S.incomes.forEach(x=>{const v=incomeM(x,s); if(v>0)evts.push({d:x.recurring?(x.day||1):1,t:x.name,a:v,c:css('--green')});});
+  S.expenses.forEach(x=>{const v=expenseM(x,s); if(v>0)evts.push({d:x.recurring?(x.day||1):1,t:x.name,a:-v,c:css('--amber')});});
+  S.cards.forEach(c=>{const b=cardBurden(c,s); if(b>0)evts.push({d:c.dueDay||1,t:c.name+' (ครบกำหนด)',a:-b,c:c.color});});
+  if(scope!=='cash'){ S.realestate.forEach(p=>{const r=reM(p,s); if(r.rent>0)evts.push({d:1,t:p.name+' ค่าเช่า',a:r.rent,c:css('--purple')}); if(r.inst+r.fees>0)evts.push({d:1,t:p.name+' งวด',a:-(r.inst+r.fees),c:css('--purple')});}); }
+  if(!evts.length)return '';
+  evts.sort((a,b)=>a.d-b.d);
+  let bal=num(S.savings), negDay=null, rw='';
+  evts.forEach(e=>{ bal+=e.a; if(bal<0&&negDay===null)negDay=e.d;
+    rw+=`<div class="rw"><span class="rwd">${e.d}</span><span class="rwn"><i style="background:${e.c}"></i>${e.t}</span><span class="rwa" style="color:${e.a>=0?css('--green'):css('--red')}">${e.a>=0?'+':''}${fmtK(e.a)}</span><span class="rwb" style="color:${bal<0?css('--red'):'var(--muted)'};font-weight:700">${fmtK(bal)}</span></div>`; });
+  const head=negDay!==null
+    ? `<div style="color:${css('--red')};font-weight:800;font-size:12.5px;margin-bottom:6px">⚠️ เงินสดติดลบตั้งแต่วันที่ ${negDay} — ต้องยืดเงินให้ถึงวันเงินเข้า</div>`
+    : `<div style="color:${css('--green')};font-weight:800;font-size:12.5px;margin-bottom:6px">✅ เงินสดพอทั้งเดือน · สิ้นเดือนเหลือ ${fmt(bal)}</div>`;
+  return `<div style="margin-top:14px;border-top:2px solid var(--line);padding-top:10px">
+    <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px">📅 ไทม์ไลน์เงินสดรายวัน (เริ่มจากเงินเก็บ ${fmtK(S.savings)})</div>
+    ${head}
+    <div class="runway"><div class="rw rwh"><span class="rwd">วัน</span><span class="rwn">รายการ</span><span class="rwa">เข้า/ออก</span><span class="rwb">คงเหลือ</span></div>${rw}</div></div>`;
 }
 function breakdownSheet(type){
   const asOf=curYM(); const scope=S.ui.scope||'cash'; const cash=scope==='cash';
@@ -672,15 +731,19 @@ function vRealEstate(v){
     html+=`<div class="panel">${emptyBox('🏠','ยังไม่มีอสังหาฯ ลองเพิ่มแผนลงทุนเพื่อจำลองรายได้ในอนาคต')}</div>`;
   }
   S.realestate.forEach(p=>{
-    const r=reM(p,asOf); const yearly=r.net*12;
+    const r=reM(p,asOf);
+    const thisYearNet=months.reduce((t,m)=>t+reM(p,m).net,0);   // สุทธิจริงตามปฏิทินปีนี้
+    const steadyNet=(num(p.rent)-num(p.fees))*12;                 // เมื่อผ่อนหมด (passive/ปี)
+    const payoff=addM(p.startMonth, p.months);
     html+=`<div class="item"><div class="head"><span class="dot" style="background:${css('--purple')}"></span>
       <div style="flex:1"><div class="name">${p.name} <span class="tag">${p.ptype||'อสังหาฯ'}</span></div>
-        <div class="meta">มูลค่า ${fmt(p.value)} · เริ่มผ่อน ${mFull(p.startMonth)} · ${p.months} งวด</div></div>
-      <div style="text-align:right"><div class="amt" style="color:${r.net>=0?css('--green'):css('--red')}">${fmt(r.net)}</div><div class="sm2" style="color:var(--muted);font-size:11px">สุทธิ/เดือน</div></div></div>
-      <div class="kv"><span>ค่าเช่ารับ</span><b style="color:${css('--green')}">${fmt(p.rent)}</b></div>
-      <div class="kv"><span>ค่างวดธนาคาร</span><b style="color:${css('--red')}">${fmt(p.installment)}</b></div>
-      <div class="kv"><span>ส่วนกลาง/ค่าอื่นๆ</span><b style="color:${css('--red')}">${fmt(p.fees)}</b></div>
-      <div class="kv"><span>ประมาณการรายได้/ปี (ถ้าคงที่)</span><b style="color:${yearly>=0?css('--green'):css('--red')}">${fmt(yearly)}</b></div>
+        <div class="meta">มูลค่า ${fmt(p.value)} · เริ่มผ่อน ${mFull(p.startMonth)} · ${p.months} งวด · ผ่อนหมด ${mFull(payoff)}</div></div>
+      <div style="text-align:right"><div class="amt" style="color:${r.net>=0?css('--green'):css('--red')}">${fmt(r.net)}</div><div class="sm2" style="color:var(--muted);font-size:11px">สุทธิ/เดือนนี้</div></div></div>
+      <div class="kv"><span>ค่าเช่ารับ/เดือน</span><b style="color:${css('--green')}">${fmt(p.rent)}</b></div>
+      <div class="kv"><span>ค่างวดธนาคาร/เดือน</span><b style="color:${css('--red')}">${fmt(p.installment)}</b></div>
+      <div class="kv"><span>ส่วนกลาง/ค่าอื่นๆ/เดือน</span><b style="color:${css('--red')}">${fmt(p.fees)}</b></div>
+      <div class="kv"><span>ประมาณการสุทธิ ปี ${y+543}</span><b style="color:${thisYearNet>=0?css('--green'):css('--red')}">${fmt(thisYearNet)}</b></div>
+      <div class="kv"><span>สุทธิ/ปี เมื่อผ่อนหมด (passive)</span><b style="color:${steadyNet>=0?css('--green'):css('--red')}">${fmt(steadyNet)}</b></div>
       <div class="rowbtns"><button class="btn ghost sm" onclick="editRE('${p.id}')">แก้ไข</button><button class="btn danger sm" onclick="delRE('${p.id}')">ลบ</button></div></div>`;
   });
   v.innerHTML=html;
@@ -802,26 +865,29 @@ window.editIncome=id=>incomeForm(id);
 window.delIncome=id=>{S.incomes=S.incomes.filter(i=>i.id!==id);save();render();};
 
 /* ----- Expense form (non-card obligations) ----- */
-function expenseForm(id){
-  const x=id?S.expenses.find(i=>i.id===id):{recurring:true,day:1,startMonth:curYM()};
+function expenseForm(id, preset){
+  preset=preset||{};
+  const x=id?S.expenses.find(i=>i.id===id):{recurring:(preset.type==='once'?false:true),day:1,startMonth:preset.month||curYM(),month:preset.month||curYM()};
   const rec=x.recurring!==false;
   openSheet(id?'แก้ไขรายจ่าย / ภาระ':'เพิ่มรายจ่าย / ภาระ',
     fieldText('e_name','ชื่อรายการ',x.name||'','เช่น ค่าไฟ, ค่าเช่าบ้าน, ค่าโทรศัพท์, ค่าเทอม')
     +fieldText('e_amount','จำนวนเงิน (บาท)',x.amount||'','0','number')
-    +fieldSelect('e_type','ประเภท',[{v:'rec',t:'ประจำทุกเดือน (ค่าไฟ/ค่าเช่า)'},{v:'once',t:'เฉพาะกิจ เดือนเดียว (ค่าซ่อม/ค่าเทอม)'}],rec?'rec':'once')
-    +`<div id="e_recwrap"><div class="field-2">`+fieldText('e_day','ครบกำหนดวันที่',x.day||1,'1','number')+fieldMonth('e_start','เริ่มเดือน',x.startMonth)+`</div></div>`
+    +fieldSelect('e_type','ประเภท / Series',[{v:'rec',t:'✓ ทำต่อทุกเดือน (Series ประจำ)'},{v:'once',t:'✗ เฉพาะเดือนเดียว (ไม่คิดต่อ)'}],rec?'rec':'once')
+    +`<div id="e_recwrap"><div class="field-2">`+fieldText('e_day','ครบกำหนดวันที่',x.day||1,'1','number')+fieldMonth('e_start','เริ่มเดือน',x.startMonth)+`</div>`
+    +`<div class="field"><label>หยุดหลังเดือน (เว้นว่าง = ต่อเนื่องไม่จบ)</label><input id="e_end" type="month" value="${x.endMonth||''}"><div class="hint">ติ๊กหยุด Series เพื่อดูว่าถ้าเลิกจ่ายรายการนี้ กราฟแนวโน้มจะเปลี่ยนยังไง</div></div></div>`
     +`<div id="e_oncewrap" class="hidden">`+fieldMonth('e_month','เดือนที่จ่าย',x.month)+`</div>`
     ,()=>{
       if(!fVal('e_name').trim()){toast('ใส่ชื่อรายการก่อน');return false;}
       const isRec=fVal('e_type')==='rec';
       const data={name:fVal('e_name').trim(),amount:fNum('e_amount'),recurring:isRec};
-      if(isRec){data.day=Math.round(fNum('e_day'));data.startMonth=fVal('e_start');}else{data.month=fVal('e_month');}
+      if(isRec){data.day=Math.round(fNum('e_day'));data.startMonth=fVal('e_start'); const em=fVal('e_end'); if(em)data.endMonth=em;}else{data.month=fVal('e_month');}
       if(id){ ['day','startMonth','endMonth','month'].forEach(k=>delete x[k]); Object.assign(x,data); }else{ S.expenses.push(Object.assign({id:uid()},data)); }
       save();render();toast('บันทึกแล้ว');
     });
   const upd=()=>{const r=fVal('e_type')==='rec';el('e_recwrap').classList.toggle('hidden',!r);el('e_oncewrap').classList.toggle('hidden',r);};
   el('e_type').onchange=upd; upd();
 }
+window.expenseFormMonth=(m)=>expenseForm(null,{month:m,type:'once'});
 window.editExpense=id=>expenseForm(id);
 window.delExpense=id=>{S.expenses=S.expenses.filter(i=>i.id!==id);save();render();};
 
@@ -871,10 +937,19 @@ window.stockPnlForm=id=>{
   el('p_month').onchange=()=>{ el('p_val').value=x.monthly?.[fVal('p_month')]||''; };
 };
 
-/* ----- Savings ----- */
+/* ----- Savings (total + monthly plan) ----- */
 function editSavings(){
-  openSheet('เงินเก็บ / เงินสด', fieldText('sv','ยอดเงินเก็บ/เงินสดคงเหลือ (บาท)',S.savings||'','0','number','ยอดเงินสด/เงินฝากที่มีอยู่ตอนนี้'),
-    ()=>{S.savings=fNum('sv');save();render();toast('บันทึกแล้ว');});
+  const y=S.ui.year, months=monthsOfYear(y);
+  let body=fieldText('sv_total','ยอดเงินเก็บรวมปัจจุบัน (บาท)',S.savings||'','0','number','เงินสด/เงินฝากที่มีตอนนี้ · ใช้เป็นจุดเริ่มกราฟแนวโน้ม (แก้ยอดรวมได้ที่นี่)')
+    +fieldText('sv_auto','ตั้งเก็บอัตโนมัติ เดือนละ (บาท)',S.savePlan.auto||'','เช่น 5000','number','ทุกเดือนจะเก็บเท่านี้ (เว้นเดือนที่กำหนดเอง) · แสดงเป็นแท่งเขียวอ่อนบนกราฟ')
+    +`<div class="field"><label>กำหนดยอดเก็บรายเดือน ปี ${y+543} (เว้นว่าง = ใช้ค่าอัตโนมัติ)</label></div>`;
+  months.forEach(m=>{ const cur=(S.savePlan.months[m]!=null)?S.savePlan.months[m]:'';
+    body+=`<div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><label style="width:70px;margin:0">${mFull(m)}</label><input id="sm_${m}" type="number" inputmode="decimal" value="${cur}" placeholder="${S.savePlan.auto||0}" style="flex:1"></div>`; });
+  openSheet('เงินเก็บ / แผนการเก็บเงิน', body, ()=>{
+    S.savings=fNum('sv_total'); S.savePlan.auto=fNum('sv_auto');
+    months.forEach(m=>{ const e=el('sm_'+m); if(!e)return; const vraw=e.value.trim(); if(vraw==='')delete S.savePlan.months[m]; else S.savePlan.months[m]=num(vraw); });
+    save();render();toast('บันทึกแล้ว');
+  });
 }
 window.editSavings=editSavings;
 
@@ -885,7 +960,13 @@ function monthlySheet(startM){
     if(!S.cards.length) body+=`<div class="empty">ยังไม่มีบัตร เพิ่มบัตรก่อนนะ</div>`;
     S.cards.forEach(c=>{ const cur=(S.actuals[m]&&S.actuals[m][c.id]!=null)?S.actuals[m][c.id]:'';
       body+=`<div class="field"><label><span class="dot" style="display:inline-block;background:${c.color};vertical-align:middle;margin-right:6px"></span>${c.name} <span class="mtag">(ค่าเริ่มต้น X = ${fmtK(c.defaultX||0)})</span></label><input id="x_${c.id}" type="number" inputmode="decimal" value="${cur}" placeholder="${c.defaultX||0}"></div>`; });
-    if(S.stocks.length){ body+=`<div style="height:1px;background:var(--line);margin:8px 0 14px"></div><div class="field"><label><b>ผลหุ้นเดือนนี้ (ไม่บังคับ)</b></label></div>`;
+    // cash / transfer expenses (non-card) for this month
+    body+=`<div style="height:1px;background:var(--line);margin:8px 0 12px"></div><div class="field"><label><b>💵 รายจ่ายเงินสด/โอน เดือนนี้ (ไม่ใช่บัตร)</b></label></div>`;
+    const exList=S.expenses.filter(x=>expenseM(x,m)>0);
+    if(exList.length){ exList.forEach(x=>{ body+=`<div class="kv"><span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${css('--amber')};margin-right:6px"></i>${x.name} ${x.recurring?'<span class="tag">Series</span>':'<span class="tag red">ครั้งเดียว</span>'}</span><b style="color:${css('--red')}">${fmt(expenseM(x,m))}</b></div>`; }); }
+    else body+=`<div class="kv"><span style="color:var(--muted)">— ยังไม่มี —</span></div>`;
+    body+=`<button class="btn ghost sm" type="button" id="mAddExp" style="margin-top:8px">➕ เพิ่มรายจ่ายเงินสด/โอน (ติ๊กได้ว่าทำต่อทุกเดือน)</button>`;
+    if(S.stocks.length){ body+=`<div style="height:1px;background:var(--line);margin:12px 0 14px"></div><div class="field"><label><b>ผลหุ้นเดือนนี้ (ไม่บังคับ)</b></label></div>`;
       S.stocks.forEach(x=>{ const cur=(x.monthly&&x.monthly[m]!=null)?x.monthly[m]:''; body+=`<div class="field"><label>${x.name} — กำไร(+)/ขาดทุน(−)</label><input id="sp_${x.id}" type="number" inputmode="decimal" value="${cur}" placeholder="0"></div>`; });
     }
     return body;
@@ -893,16 +974,18 @@ function monthlySheet(startM){
   const startMonth = startM || curYM();
   const bodyHtml = fieldMonth('mm','เลือกเดือน (กรอกย้อนหลัง/ล่วงหน้าได้)', startMonth)
     + `<div id="mBody">${buildBody(startMonth)}</div>`;
-  const submit=()=>{
-    const m=el('mm').value;
+  const persist=(m)=>{
     S.actuals[m]=S.actuals[m]||{};
     S.cards.forEach(c=>{ const e=el('x_'+c.id); if(!e)return; const v=e.value.trim(); if(v==='')delete S.actuals[m][c.id]; else S.actuals[m][c.id]=num(v); });
     if(Object.keys(S.actuals[m]).length===0)delete S.actuals[m];
     S.stocks.forEach(x=>{ const e=el('sp_'+x.id); if(!e)return; x.monthly=x.monthly||{}; const v=e.value.trim(); if(v==='')delete x.monthly[m]; else x.monthly[m]=num(v); });
-    save();render();toast('อัปเดตเดือน '+mFull(m)+' แล้ว');
+    save();
   };
+  const submit=()=>{ const m=el('mm').value; persist(m); render(); toast('อัปเดตเดือน '+mFull(m)+' แล้ว'); };
+  const wireBody=()=>{ const b=el('mAddExp'); if(b)b.onclick=()=>{ persist(el('mm').value); expenseFormMonth(el('mm').value); }; };
   openSheet('บันทึกยอดใช้จ่ายรายเดือน', bodyHtml, submit, 'บันทึกเดือนนี้');
-  el('mm').onchange=()=>{ el('mBody').innerHTML=buildBody(el('mm').value); };
+  el('mm').onchange=()=>{ el('mBody').innerHTML=buildBody(el('mm').value); wireBody(); };
+  wireBody();
 }
 
 /* ============================ SETTINGS ============================ */
